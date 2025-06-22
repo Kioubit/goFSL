@@ -1,0 +1,16 @@
+services:
+  goFSL:
+    image: ghcr.io/kioubit/gofsl:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: goFSL
+    restart: always
+    ports:
+      - "8080"
+    volumes:
+      - "./data:/data"
+    logging:
+      options:
+        max-size: "100M"
+        max-file: "2"

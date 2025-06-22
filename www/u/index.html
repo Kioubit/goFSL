@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>goFSL - Upload</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    #mainContainer {
+        width: 20em;
+        margin: auto;
+    }
+
+    .text-center {
+        text-align: center;
+    }
+
+    #dropZone {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        align-self: center;
+        border: 4px dashed #5a5a5a;
+        width: 20em;
+        height: 10em;
+        margin-bottom: 1em;
+    }
+
+    #dropZone.active {
+        border: 4px dashed red;
+    }
+
+    #dropZone [type="file"] {
+        display: none;
+    }
+
+    #maxDownloadsInput {
+        width: 4em;
+    }
+
+    #maxDownloadsInput[disabled] {
+        text-indent: -9em;
+    }
+
+    #dataInput {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .noDisplay {
+        display: none !important;
+    }
+
+    .disable {
+        pointer-events: none;
+        opacity: 0.4;
+    }
+
+    .linkOutput {
+        overflow-x: scroll;
+        text-wrap: nowrap;
+        margin-bottom: 1em;
+        background-color: gainsboro;
+        scrollbar-width: thin;
+    }
+
+    .text-start {
+        text-align: start;
+    }
+
+    progress {
+        width: 95%;
+    }
+
+    #resultDiv {
+        margin-top: 1em;
+    }
+</style>
+<div id="mainContainer" class="text-center">
+    <h2>goFSL</h2>
+    <div id="dataInput">
+        <div id="dropZone">
+            <p>Drop file here or click to upload</p>
+            <input type="file" id="fileInput"/>
+        </div>
+        <div class="text-start">
+            <label for="expirySelect">Expiry:</label>
+            <select id="expirySelect">
+                <option value="600">10 minutes</option>
+                <option value="3600">1 hour</option>
+                <option selected value="86400">1 day</option>
+                <option value="604800">1 week</option>
+                <option value="2592000">1 month</option>
+            </select>
+            <label for="maxDownloadsInput">Max downloads:</label>
+            <input id="maxDownloadsInput" type="number" value="1">
+            <label for="unlimitedDownloadsInput">Unlimited Downloads</label>
+            <input id="unlimitedDownloadsInput" type="checkbox">
+        </div>
+    </div>
+    <hr>
+    <progress id="progress" value="0"></progress>
+    <div id="resultDiv" class="noDisplay">
+        <div class="text-start">Download:</div>
+        <div class="linkOutput"><a href="#" id="downloadLink"></a></div>
+        <div class="text-start">Delete:</div>
+        <div class="linkOutput"><a href="#" id="deletionLink"></a></div>
+    </div>
+</div>
+<script type="module">
+    import * as goFSL from "../assets/goFSL.js";
+
+    // TODO Fetch file as downloadable stream & readable streams
+    // https://stackoverflow.com/questions/63942715/how-to-download-a-readablestream-on-the-browser-that-has-been-returned-from-fetc
+    // https://stackoverflow.com/questions/70553333/upload-file-using-fetch-and-calc-the-progress-using-readable-streams-not-work-as
+
+    const dropZone = document.getElementById("dropZone");
+    const fileInput = document.getElementById("fileInput");
+    const progressBar = document.getElementById("progress");
+    const resultDiv = document.getElementById("resultDiv");
+    const dataInputDiv = document.getElementById("dataInput");
+    const downloadLink = document.getElementById("downloadLink");
+    const deletionLink = document.getElementById("deletionLink");
+    const maxDownloadsInput = document.getElementById("maxDownloadsInput");
+    const unlimitedDownloadsInput = document.getElementById("unlimitedDownloadsInput");
+    const expiryInput = document.getElementById("expirySelect");
+
+
+    unlimitedDownloadsInput.onchange = () => {
+        if (unlimitedDownloadsInput.checked) {
+            maxDownloadsInput.value = -2;
+            maxDownloadsInput.disabled = true;
+        } else {
+            maxDownloadsInput.value = 1;
+            maxDownloadsInput.disabled = false;
+        }
+    }
+
+    dropZone.addEventListener("click", () => {
+        fileInput.click();
+    });
+    dropZone.addEventListener("drop", dropHandler)
+    dropZone.addEventListener("dragover", (ev) => {
+        ev.preventDefault();
+        dropZone.classList.add("active");
+    })
+    dropZone.addEventListener("dragleave", (ev) => {
+        ev.preventDefault();
+        dropZone.classList.remove("active");
+    })
+
+    function dropHandler(ev) {
+        ev.preventDefault();
+        fileInput.files = ev.dataTransfer.files;
+        handleFileInput()
+        dropZone.classList.remove("active");
+    }
+
+    fileInput.onchange = async () => {
+        handleFileInput()
+    }
+
+    function handleFileInput() {
+        const files = fileInput.files;
+        if (files.count === 0) {
+            alert("No files selected");
+            return;
+        }
+        const file = files[0];
+        if (file.name === undefined) {
+            return;
+        }
+
+        fileInput.value = null;
+        downloadLink.innerText = "";
+        downloadLink.href = "#";
+        deletionLink.innerText = "";
+        deletionLink.href = "#";
+        dataInputDiv.classList.add("disable");
+        progressBar.removeAttribute("value");
+        resultDiv.classList.add("noDisplay");
+
+
+        goFSL.uploadFile(file, Math.trunc(new Date() / 1000) + parseInt(expiryInput.value, 10), maxDownloadsInput.value, function (progressPercent) {
+            progressBar.value = progressPercent / 100;
+        }).then((result) => {
+            dataInputDiv.classList.remove("disable");
+            resultDiv.classList.remove("noDisplay");
+            downloadLink.innerText = result.Download;
+            downloadLink.href = result.Download;
+            deletionLink.innerText = result.Delete;
+            deletionLink.href = result.Delete;
+            alert("Upload completed")
+        }).catch(err => {
+            dataInputDiv.classList.remove("disabled");
+            console.log(err)
+            alert(err)
+        });
+    }
+</script>
+
+</html>
+
