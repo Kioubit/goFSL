@@ -15,7 +15,7 @@ type account struct {
 
 type config struct {
 	MaxFileSizeMb uint64    `toml:"max_file_mb"`
-	Accounts      []account `toml:"accounts"`
+	AccountList   []account `toml:"account"`
 }
 
 func ReadConfig(configFile string) error {

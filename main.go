@@ -13,7 +13,9 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{AddSource: true})))
 
 	dataDir := flag.String("dataDir", "data/", "path to data directory")
-	configFile := flag.String("configFile", "", "path to config file (optional)")
+	configFile := flag.String("configFile", "data/config.toml", "path to config file (optional)")
+	httpPort := flag.Int("httpPort", 8080, "http port to listen on")
+
 	flag.Parse()
 
 	config.DataDir = ensureTrailingSlash(*dataDir)
@@ -46,9 +48,9 @@ func main() {
 	DeleteAllExpiredFiles()
 	go ExpiryObserver()
 
-	slog.Info("Initialization completed")
+	slog.Info("Initialization completed", "http_port", *httpPort)
 
-	if err := startHTTPServer(); err != nil {
+	if err := startHTTPServer(*httpPort); err != nil {
 		slog.Error("error starting http server", "err", err)
 	}
 }

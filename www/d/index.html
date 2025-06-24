@@ -56,6 +56,13 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+        #errorDisplay {
+            font-weight: bold;
+            font-size: large;
+            color: red;
+            margin-top: 1em;
+            margin-bottom: 1em;
+        }
         #metadata {
             margin-top: 2em;
             border: 1px solid black;
@@ -64,20 +71,29 @@
         .noDisplay {
             display: none;
         }
+        #source-code-link {
+            font-size: 0.8em;
+            margin-top: 3em;
+        }
     </style>
 </head>
 <body>
 <div id="mainContainer" class="text-center">
+    <!--Blank page icon created by Tempo_doloe - https://www.flaticon.com/ -->
     <img width="128" height="128" alt="file icon" src="../assets/file.png">
     <div>
         <div id="fileName">...</div>
+        <div id="errorDisplay"></div>
         <button disabled id="downloadBtn">Download</button>
         <div>
             <progress id="progressBar"></progress>
         </div>
         <div class="text-start noDisplay" id="metadata"></div>
     </div>
-   <!-- <a href="https://www.flaticon.com/free-icons/blank-page" title="blank page icons">Blank page icons created by Tempo_doloe - Flaticon</a> -->
+    <div id="source-code-link">
+        <a href="https://github.com/Kioubit/goFSL">Source code</a>
+    </div>
+
 </div>
 
 </body>
@@ -88,6 +104,7 @@
     const downloadBtn = document.getElementById("downloadBtn");
     const progressBar = document.getElementById("progressBar");
     const fileNameDiv = document.getElementById("fileName");
+    const errorDiv = document.getElementById("errorDisplay");
     const metadataDiv = document.getElementById("metadata");
 
     let fileMeta = null;
@@ -106,12 +123,14 @@
             Expiry: ${new Date(fileMeta.Expiry*1000).toLocaleString()}`;
             metadataDiv.classList.remove("noDisplay");
         }).catch(err => {
-            fileNameDiv.innerText = err.toString();
-            fileNameDiv.style.color = "red";
+            fileNameDiv.innerText = "";
+            errorDiv.innerText = err.toString();
             progressBar.value = 0;
         })
     } else {
-        alert("Invalid URL")
+        fileNameDiv.innerText = "";
+        errorDiv.innerText = "Invalid URL";
+        progressBar.value = 0;
     }
 
     downloadBtn.onclick = () => {
@@ -122,8 +141,13 @@
         }).then(() => {
             downloadBtn.innerText = "Downloaded";
         }).catch(err => {
+            if (err.name === 'AbortError') {
+                downloadBtn.disabled = false;
+                return;
+            }
+            fileNameDiv.innerText = "";
             downloadBtn.innerText = "Error";
-            alert(err)
+            errorDiv.innerText = err.toString();
         })
     }
 

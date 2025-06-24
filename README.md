@@ -12,16 +12,11 @@
 
 ## Quickstart with docker
 ```shell
-# Create the data directory
-mkdir -p data
-# Create an empty config.toml file, see the example to populate (optional)
-touch config.toml
-
 docker run -d \
   --name goFSL \
   --restart always \
   -p 8080:8080 \
   -v "$(pwd)/data:/data" \
-  -v "$(pwd)/config.toml:/config.toml" \
   ghcr.io/kioubit/gofsl:latest
 ```
+Optional example config file: [config.toml](docs/example-config.toml) (to be placed in the data directory)

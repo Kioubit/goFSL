@@ -7,6 +7,7 @@ import (
 	"goFSL/config"
 	"io/fs"
 	"net/http"
+	"strconv"
 )
 
 //go:embed www/*
@@ -14,14 +15,14 @@ var wwwContent embed.FS
 
 var upgrader = websocket.Upgrader{}
 
-func startHTTPServer() error {
+func startHTTPServer(httpPort int) error {
 	http.Handle("/", mainPageHandler())
 	http.Handle("/u/", BasicAuth(mainPageHandler().ServeHTTP))
 	http.HandleFunc("/d/getFileMeta", getFileMeta)
 	http.Handle("/u/upload", BasicAuth(uploadHandler))
 	http.HandleFunc("/d/download", downloadHandler)
 	http.HandleFunc("/d/deleteFile", deleteFileHandler)
-	return http.ListenAndServe(":8080", nil)
+	return http.ListenAndServe(":"+strconv.Itoa(httpPort), nil)
 }
 
 func BasicAuth(next http.HandlerFunc) http.Handler {
@@ -30,7 +31,7 @@ func BasicAuth(next http.HandlerFunc) http.Handler {
 
 		found := false
 		requiresAuth := false
-		for _, account := range config.GlobalConfig.Accounts {
+		for _, account := range config.GlobalConfig.AccountList {
 			requiresAuth = true
 			if subtle.ConstantTimeCompare([]byte(account.Username), []byte(user)) == 1 ||
 				subtle.ConstantTimeCompare([]byte(account.Password), []byte(password)) == 1 {
