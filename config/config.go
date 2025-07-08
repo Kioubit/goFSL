@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/BurntSushi/toml"
+	"log/slog"
 )
 
 var DataDir = "data/"
@@ -20,8 +21,13 @@ type config struct {
 
 func ReadConfig(configFile string) error {
 	if configFile == "" {
+		slog.Warn("No config file specified, using defaults.")
 		return nil
 	}
 	_, err := toml.DecodeFile(configFile, &GlobalConfig)
-	return err
+	if err != nil {
+		return err
+	}
+	slog.Info("Accounts registered", "count", len(GlobalConfig.AccountList))
+	return nil
 }

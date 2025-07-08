@@ -1,13 +1,13 @@
 max_file_mb = 1000
 
-[[accounts]]
+[[account]]
 username = "user1"
 password = "password1"
 
-[[accounts]]
+[[account]]
 username = "user2"
 password = "password2"
 
-[[accounts]]
+[[account]]
 username = "user3"
 password = "password3"

@@ -13,7 +13,7 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{AddSource: true})))
 
 	dataDir := flag.String("dataDir", "data/", "path to data directory")
-	configFile := flag.String("configFile", "data/config.toml", "path to config file (optional)")
+	configFile := flag.String("configFile", "", "path to config file (optional)")
 	httpPort := flag.Int("httpPort", 8080, "http port to listen on")
 
 	flag.Parse()
