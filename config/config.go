@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/BurntSushi/toml"
 	"log/slog"
+
+	"github.com/BurntSushi/toml"
 )
 
 var DataDir = "data/"

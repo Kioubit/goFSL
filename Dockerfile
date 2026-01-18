@@ -14,6 +14,6 @@ COPY --from=build /data /data
 COPY --from=build /config.toml /config.toml
 
 
-EXPOSE 8080:8080
+EXPOSE 8080
 LABEL description="goFSL"
 ENTRYPOINT ["/bin/goFSL", "-dataDir",  "/data", "-configFile", "/data/config.toml"]

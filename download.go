@@ -2,7 +2,8 @@ package main
 
 import (
 	"bufio"
-	"github.com/gorilla/websocket"
+	"database/sql"
+	"errors"
 	"goFSL/config"
 	"goFSL/db"
 	"io"
@@ -11,6 +12,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
@@ -20,12 +23,16 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not upgrade to websocket", http.StatusBadRequest)
 		return
 	}
-	defer func(c *websocket.Conn) {
+	defer func() {
 		_ = c.Close()
-	}(c)
-	err = c.SetWriteDeadline(time.Now().Add(30 * time.Second))
+	}()
+
+	err = c.SetReadDeadline(time.Now().Add(ConnDeadline))
 	if err != nil {
-		http.Error(w, http.StatusText(500), http.StatusInternalServerError)
+		return
+	}
+	err = c.SetWriteDeadline(time.Now().Add(ConnDeadline))
+	if err != nil {
 		return
 	}
 
@@ -42,20 +49,23 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	downloadCompleted := false
 	var dbRemainingDownloads = 0
-	if fMeta.DownloadsRemaining != -2 {
-		err = db.SystemDB.QueryRow("UPDATE files SET DownloadsRemaining = MAX(DownloadsRemaining - 1, -1) WHERE ID = ? RETURNING DownloadsRemaining", decryptedID).Scan(&dbRemainingDownloads)
+	if fMeta.DownloadsRemaining != -1 {
+		err = db.SystemDB.QueryRow("UPDATE files SET DownloadsRemaining = DownloadsRemaining - 1 WHERE ID = ? AND DownloadsRemaining > 0 RETURNING DownloadsRemaining + 1",
+			decryptedID).Scan(&dbRemainingDownloads)
 		if err != nil {
-			slog.Error("DB error", "err", err)
-			sendWebsocketError(c, "")
-			return
+			if !errors.Is(err, sql.ErrNoRows) {
+				slog.Error("DB error", "err", err)
+				sendWebsocketError(c, "")
+				return
+			}
 		}
 	}
-	if dbRemainingDownloads < 0 {
+	if dbRemainingDownloads == 0 {
 		sendWebsocketError(c, "Maximum download count exceeded")
 		return
 	}
 	defer func() {
-		if !downloadCompleted && fMeta.DownloadsRemaining != -2 {
+		if !downloadCompleted && fMeta.DownloadsRemaining != -1 {
 			// Reset in case of failed download
 			_, _ = db.SystemDB.Exec("UPDATE files SET DownloadsRemaining = DownloadsRemaining + 1 where ID = ?", decryptedID)
 		}
@@ -67,14 +77,21 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		sendWebsocketError(c, "")
 		return
 	}
-	defer func(f *os.File) {
+	defer func() {
 		_ = f.Close()
-	}(f)
+	}()
 	g := bufio.NewReader(f)
 
 	var sentBytes uint64 = 0
 	for {
-		_ = c.SetWriteDeadline(time.Now().Add(30 * time.Second))
+		err = c.SetReadDeadline(time.Now().Add(ConnDeadline))
+		if err != nil {
+			return
+		}
+		err = c.SetWriteDeadline(time.Now().Add(ConnDeadline))
+		if err != nil {
+			return
+		}
 		_, _, err = c.ReadMessage()
 		if err != nil {
 			sendWebsocketError(c, "")
@@ -101,7 +118,9 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	downloadCompleted = true
-	if dbRemainingDownloads == 0 && fMeta.DownloadsRemaining != -2 {
-		deleteFile(decryptedID)
+	if dbRemainingDownloads == 1 && fMeta.DownloadsRemaining != -1 {
+		if err := deleteFile(decryptedID); err != nil {
+			slog.Warn("error deleting file", "err", err, "id", decryptedID)
+		}
 	}
 }

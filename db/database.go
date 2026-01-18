@@ -4,8 +4,9 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
 	"log/slog"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var SystemDB *sql.DB

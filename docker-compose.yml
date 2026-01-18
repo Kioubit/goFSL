@@ -7,10 +7,9 @@ services:
     container_name: goFSL
     restart: always
     ports:
-      - "8080"
+      - "8080:8080"
     volumes:
       - "./data:/data"
     logging:
       options:
-        max-size: "100M"
-        max-file: "2"
+        max-size: "5M"

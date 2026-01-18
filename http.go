@@ -3,11 +3,14 @@ package main
 import (
 	"crypto/subtle"
 	"embed"
-	"github.com/gorilla/websocket"
 	"goFSL/config"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"strconv"
+
+	"github.com/gorilla/websocket"
+	"golang.org/x/crypto/bcrypt"
 )
 
 //go:embed www/*
@@ -27,19 +30,19 @@ func startHTTPServer(httpPort int) error {
 
 func BasicAuth(next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requiresAuth := len(config.GlobalConfig.AccountList) != 0
+
 		user, password, _ := r.BasicAuth()
 
-		found := false
-		requiresAuth := false
+		authOK := false
 		for _, account := range config.GlobalConfig.AccountList {
-			requiresAuth = true
-			if subtle.ConstantTimeCompare([]byte(account.Username), []byte(user)) == 1 ||
-				subtle.ConstantTimeCompare([]byte(account.Password), []byte(password)) == 1 {
-				found = true
+			if account.Username == user {
+				authOK = bcrypt.CompareHashAndPassword([]byte(account.Password), []byte(password)) == nil
+				break
 			}
 		}
 
-		if !found && requiresAuth {
+		if !authOK && requiresAuth {
 			w.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
 			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
@@ -67,6 +70,8 @@ func deleteFileHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Incorrect deletion token", http.StatusBadRequest)
 		return
 	}
-	deleteFile(decryptedID)
+	if err := deleteFile(decryptedID); err != nil {
+		slog.Warn("error deleting file", "err", err, "id", decryptedID)
+	}
 	_, _ = w.Write([]byte("File deleted"))
 }

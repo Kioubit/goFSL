@@ -11,25 +11,24 @@ var temporaryIDsLock sync.Mutex
 
 const maxIDs = 1000
 
-func GetTemporaryID() (id string, err error) {
+func GetTemporaryID() (id string, release func(), err error) {
+	release = func() {}
 	temporaryIDsLock.Lock()
 	defer temporaryIDsLock.Unlock()
 	for i := 0; i < maxIDs; i++ {
 		_, exists := temporaryIDs[i]
 		if !exists {
 			temporaryIDs[i] = struct{}{}
-			return strconv.Itoa(i), nil
+			return strconv.Itoa(i), func() {
+				releaseTemporaryID(i)
+			}, nil
 		}
 	}
-	return "", errors.New("max IDs reached")
+	return "", release, errors.New("max IDs reached")
 }
 
-func ReleaseTemporaryID(id string) {
-	idInt, err := strconv.Atoi(id)
-	if err != nil {
-		return
-	}
+func releaseTemporaryID(id int) {
 	temporaryIDsLock.Lock()
 	defer temporaryIDsLock.Unlock()
-	delete(temporaryIDs, idInt)
+	delete(temporaryIDs, id)
 }

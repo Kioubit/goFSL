@@ -8,13 +8,15 @@ import (
 	"time"
 )
 
-func DeleteAllExpiredFiles() {
+func deleteAllExpiredFiles() {
 	rows, err := db.SystemDB.Query("SELECT ID FROM files where Expiry <  ?", time.Now().Unix())
 	if err != nil {
 		slog.Warn("Failed to delete all expired files", "err", err)
 		return
 	}
-	toDelete := make([]int64, 0)
+	defer func() {
+		_ = rows.Close()
+	}()
 	for rows.Next() {
 		var ID int64
 		err = rows.Scan(&ID)
@@ -22,20 +24,21 @@ func DeleteAllExpiredFiles() {
 			slog.Warn("Failed to delete expired files", "err", err)
 			return
 		}
-		toDelete = append(toDelete, ID)
+
+		if err = deleteFile(ID); err != nil {
+			slog.Warn("error deleting expired file", "err", err, "id", ID)
+		}
 	}
 	if err = rows.Err(); err != nil {
 		slog.Warn("Failed to delete all expired files", "err", err)
 		return
-	}
-	for _, ID := range toDelete {
-		deleteFile(ID)
 	}
 }
 
 var NextExpiryChannel = make(chan int64, 2)
 
 func ExpiryObserver() {
+	deleteAllExpiredFiles()
 	var trackedExpiry = getNextExpiryTime()
 	for {
 		if trackedExpiry == 0 {
@@ -48,7 +51,7 @@ func ExpiryObserver() {
 				trackedExpiry = receivedTime
 			}
 		case <-delay.C:
-			DeleteAllExpiredFiles()
+			deleteAllExpiredFiles()
 			trackedExpiry = getNextExpiryTime()
 		}
 		delay.Stop()

@@ -4,14 +4,14 @@ import (
 	cryptoRand "crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"github.com/gorilla/websocket"
 	"os"
-	"strings"
+	"path/filepath"
+
+	"github.com/gorilla/websocket"
 )
 
 func createDirectory(basePath, path string) error {
-	basePath = ensureTrailingSlash(basePath)
-	fullPath := basePath + path
+	fullPath := filepath.Join(basePath, path)
 	stat, err := os.Stat(fullPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -28,11 +28,20 @@ func createDirectory(basePath, path string) error {
 	return nil
 }
 
-func ensureTrailingSlash(path string) string {
-	if !strings.HasSuffix(path, "/") {
-		path += "/"
+func clearTempDirectory(tempDirectoryPath string) error {
+	entries, err := os.ReadDir(tempDirectoryPath)
+	if err != nil {
+		return err
 	}
-	return path
+
+	for _, entry := range entries {
+		fullPath := filepath.Join(tempDirectoryPath, entry.Name())
+		err = os.RemoveAll(fullPath)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func sendWebsocketError(c *websocket.Conn, message string) {
@@ -42,11 +51,11 @@ func sendWebsocketError(c *websocket.Conn, message string) {
 	_ = c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(4000, message))
 }
 
-func getRandomToken() (string, error) {
+func getRandomToken() string {
 	randomBytes := make([]byte, 32)
 	_, err := cryptoRand.Read(randomBytes)
 	if err != nil {
-		return "", err
+		panic(err)
 	}
-	return base64.StdEncoding.EncodeToString(randomBytes), nil
+	return base64.StdEncoding.EncodeToString(randomBytes)
 }

@@ -7,9 +7,9 @@ import (
 	"goFSL/config"
 	"goFSL/db"
 	"goFSL/id"
-	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -54,10 +54,17 @@ func retrieveFileFromDB(encryptedID string) (int64, string, fileMetaData, error)
 	return int64(decryptedID), deletionToken, fMeta, nil
 }
 
-func deleteFile(ID int64) {
-	_, _ = db.SystemDB.Exec("DELETE FROM files WHERE ID=?", ID)
-	err := os.Remove(config.DataDir + "files/" + strconv.FormatInt(ID, 10))
+func deleteFile(ID int64) (err error) {
+	err = os.Remove(filepath.Join(config.DataDir, "files", strconv.FormatInt(ID, 10)))
 	if err != nil {
-		slog.Error("error deleting file", "err", err)
+		return err
 	}
+	_, err = db.SystemDB.Exec("DELETE FROM files WHERE ID=?", ID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	return
 }

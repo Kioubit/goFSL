@@ -1,13 +1,15 @@
 max_file_mb = 1000
 
+# Passwords are to be generated using: mkpasswd -m bcrypt
+
 [[account]]
 username = "user1"
-password = "password1"
+password = "$2b$05$mEPfnF8VjZikWo4cQvhFlekDg3IEOHYmca03hWPzacWlxwu5Y3WD2"
 
 [[account]]
 username = "user2"
-password = "password2"
+password = "$2b$05$nc6GCnvyA2gkCM0Tr7UafO3KN2VQInuumSBaFSlXb3FgTLAIqrgSu"
 
 [[account]]
 username = "user3"
-password = "password3"
+password = "$2b$05$bwIBYwckeAC9uubbzxTkvuxXnzzS32qOGe0UMB/UpfVaJfqsdBcB."

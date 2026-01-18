@@ -7,6 +7,7 @@ import (
 	"goFSL/id"
 	"log/slog"
 	"os"
+	"path/filepath"
 )
 
 func main() {
@@ -18,10 +19,10 @@ func main() {
 
 	flag.Parse()
 
-	config.DataDir = ensureTrailingSlash(*dataDir)
+	config.DataDir = *dataDir
 
 	if err := config.ReadConfig(*configFile); err != nil {
-		slog.Error("Error reading config file", "error", err)
+		slog.Error("error reading config file", "error", err)
 		os.Exit(1)
 	}
 
@@ -35,22 +36,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := createDirectory(config.DataDir, "files/"); err != nil {
+	if err := createDirectory(config.DataDir, "files"); err != nil {
 		slog.Error("error creating directory", "err", err)
 		os.Exit(1)
 	}
 
-	if err := createDirectory(config.DataDir, "files/temp"); err != nil {
+	if err := createDirectory(config.DataDir, filepath.Join("files", "temp")); err != nil {
 		slog.Error("error creating directory", "err", err)
 		os.Exit(1)
 	}
 
-	DeleteAllExpiredFiles()
+	if err := clearTempDirectory(filepath.Join(config.DataDir, "files", "temp")); err != nil {
+		slog.Error("error clearing temp directory", "err", err)
+		os.Exit(1)
+	}
+
 	go ExpiryObserver()
 
 	slog.Info("Initialization completed", "http_port", *httpPort)
 
 	if err := startHTTPServer(*httpPort); err != nil {
 		slog.Error("error starting http server", "err", err)
+		os.Exit(1)
 	}
 }
