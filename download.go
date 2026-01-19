@@ -61,7 +61,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if dbRemainingDownloads == 0 {
+	if dbRemainingDownloads == 0 && fMeta.DownloadsRemaining != -1 {
 		sendWebsocketError(c, "Maximum download count exceeded")
 		return
 	}
