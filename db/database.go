@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -17,7 +18,7 @@ var sqlSchema []byte
 func InitDB(dataDir string) error {
 	const filename = "state.db"
 	var err error
-	SystemDB, err = sql.Open("sqlite3", dataDir+filename+"?_busy_timeout=30000")
+	SystemDB, err = sql.Open("sqlite3", filepath.Join(dataDir, filename)+"?_busy_timeout=30000")
 	if err != nil {
 		return err
 	}
