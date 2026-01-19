@@ -4,24 +4,28 @@
     if (!window.isSecureContext) {
         alert("This page only works in secure contexts (HTTPS)");
     }
-})()
+})();
 
 export async function getFileMetaData(id, key) {
-    const result = await fetch("getFileMeta?id=" + encodeURIComponent(id))
+    const result = await fetch(`getFileMeta?id=${encodeURIComponent(id)}`);
     if (!result.ok) {
         const errorText = await result.text();
         if (errorText !== "") {
-            throw new Error(errorText)
+            throw new Error(errorText);
         }
-        throw new Error("Server error")
+        throw new Error("Server error");
     }
     const resultJSON = await result.json();
     const resultArray = base64ToArrayBuffer(resultJSON["UserMetaData"]);
 
     const rawKey = base64ToArrayBuffer(key);
-    const k = await window.crypto.subtle.importKey("raw", rawKey, "AES-GCM", false, ["decrypt"]);
+    const k = await window.crypto.subtle.importKey(
+        "raw", rawKey, "AES-GCM", false, ["decrypt"]
+    );
 
-    resultJSON["UserMetaData"] = JSON.parse(new TextDecoder().decode(await decryptData(resultArray, k, BigInt(0))));
+    resultJSON["UserMetaData"] = JSON.parse(
+        new TextDecoder().decode(await decryptData(resultArray, k, BigInt(0)))
+    );
     resultJSON["key"] = k;
     resultJSON["id"] = id;
     return resultJSON;
@@ -30,24 +34,26 @@ export async function getFileMetaData(id, key) {
 export async function uploadFile(file, expiry, maxDownloads, onProgress) {
     const BUFFER_THRESHOLD = 3 * 1024 * 1024; // 3MB
 
-    return new Promise(async (resolve, reject) => {
-        try {
-            const filename = file.name;
-            const fileSize = file.size;
-            const stream = file.stream();
+    try {
+        const filename = file.name;
+        const fileSize = file.size;
+        const stream = file.stream();
 
-            const requestParams = new URLSearchParams();
-            requestParams.set("expiry", expiry);
-            requestParams.set("max_downloads", maxDownloads)
-            const ws = await openWebsocket("upload?" + requestParams.toString());
+        const requestParams = new URLSearchParams();
+        requestParams.set("expiry", expiry);
+        requestParams.set("max_downloads", maxDownloads);
+        const ws = await openWebsocket(`upload?${requestParams.toString()}`);
 
+        const wsErrorPromise = new Promise((_, reject) => {
             ws.onclose = (ev) => {
                 if (ev.code === 4000) {
-                    reject(new Error(ev.reason))
+                    reject(new Error(ev.reason));
                 }
-            }
+            };
+        });
 
-            const key = await window.crypto.subtle.generateKey({name: 'AES-GCM', length: 256}, true, ["encrypt"]);
+        const uploadPromise = (async () => {
+            const key = await window.crypto.subtle.generateKey({"name": "AES-GCM", "length": 256}, true, ["encrypt"]);
 
             let chunkCounter = BigInt(1); // Zero is reserved for metadata
 
@@ -55,10 +61,10 @@ export async function uploadFile(file, expiry, maxDownloads, onProgress) {
             let sentBytesEncrypted = 0;
             let lastProgressPercent = "0";
 
-            const mReader = new FullStreamReader(3000000, stream)
+            const mReader = new FullStreamReader(3000000, stream);
 
             while (true) {
-                const {done, value} = await mReader.read()
+                const {done, value} = await mReader.read();
                 if (done) {
                     break;
                 }
@@ -70,10 +76,10 @@ export async function uploadFile(file, expiry, maxDownloads, onProgress) {
                 sentBytesEncrypted += encryptedChunk.byteLength;
 
                 while (ws.bufferedAmount > BUFFER_THRESHOLD) {
-                    await new Promise(r => setTimeout(r, 10));
+                    await new Promise((r) => { setTimeout(r, 10); });
                 }
 
-                const progressPercent = ((sentBytesPlain / fileSize) * 100).toFixed(1)
+                const progressPercent = ((sentBytesPlain / fileSize) * 100).toFixed(1);
                 if (progressPercent !== lastProgressPercent) {
                     onProgress(progressPercent);
                     lastProgressPercent = progressPercent;
@@ -83,7 +89,7 @@ export async function uploadFile(file, expiry, maxDownloads, onProgress) {
             onProgress("100");
 
             // Send amount of sent encrypted bytes
-            await sendOnWebsocket(ws, sentBytesEncrypted.toString(10))
+            await sendOnWebsocket(ws, sentBytesEncrypted.toString(10));
 
             // Send user metadata
             const userMetadata = {
@@ -93,10 +99,10 @@ export async function uploadFile(file, expiry, maxDownloads, onProgress) {
             await sendOnWebsocket(ws, await encryptData(new TextEncoder().encode(JSON.stringify(userMetadata)), key, BigInt(0)));
 
             // Receive upload details
-            const result = await receiveFromWebsocket(ws)
+            const result = await receiveFromWebsocket(ws);
             ws.close();
 
-            const resultJSON = JSON.parse(result.data)
+            const resultJSON = JSON.parse(result.data);
 
             const exportedKey = arrayBufferToBase64(await window.crypto.subtle.exportKey('raw', key));
 
@@ -108,15 +114,16 @@ export async function uploadFile(file, expiry, maxDownloads, onProgress) {
             deleteParams.set("id", resultJSON.ID);
             deleteParams.set("deletionToken", resultJSON.DeletionToken);
 
-            resolve({
+            return {
                 "Download": `${window.location.href.slice(0, -2)}d/#${dlParams.toString()}`,
                 "Delete": `${window.location.href.slice(0, -2)}d/deleteFile?${deleteParams.toString()}`
-            });
-        } catch (err) {
-            console.log(err)
-            reject(err);
-        }
-    });
+            };
+        })();
+        return await Promise.race([uploadPromise, wsErrorPromise]);
+    } catch (err) {
+        console.log(err);
+        throw err;
+    }
 }
 
 class FullStreamReader {
@@ -128,7 +135,7 @@ class FullStreamReader {
     constructor(bufferLength, stream) {
         this.bufferLength = bufferLength;
         this.buffer = new ArrayBuffer(bufferLength);
-        this.reader = stream.getReader({'mode': 'byob'})
+        this.reader = stream.getReader({'mode': 'byob'});
     }
 
     async read() {
@@ -191,17 +198,17 @@ export async function downloadFile(fileMetaData, onProgress) {
     }
 
     window.onpagehide = () => {
-        writer.abort()
-    }
+        writer.abort();
+    };
 
     window.onbeforeunload = () => {
         return "Are you sure you want to leave?";
-    }
+    };
 
-    const ws = await openWebsocket("download?id=" + encodeURIComponent(id));
-    let chunkCounter = BigInt(1)
+    const ws = await openWebsocket(`download?id=${encodeURIComponent(id)}`);
+    let chunkCounter = BigInt(1);
 
-    await sendOnWebsocket(ws, "chunk")
+    await sendOnWebsocket(ws, "chunk");
 
     const closePromise = new Promise((accept, reject) => {
         ws.onclose = (ev) => {
@@ -211,8 +218,8 @@ export async function downloadFile(fileMetaData, onProgress) {
             } else {
                 accept();
             }
-        }
-    })
+        };
+    });
 
     let receivedBytes = 0;
     let lastProgressPercent = "0";
@@ -220,7 +227,7 @@ export async function downloadFile(fileMetaData, onProgress) {
     ws.onerror = (err) => {
         console.log(err);
         writer.abort();
-    }
+    };
 
     ws.onmessage = async (evt) => {
         try {
@@ -230,29 +237,29 @@ export async function downloadFile(fileMetaData, onProgress) {
             } else {
                 receivedBytes += received.byteLength;
                 const decryptedChunk = await decryptData(received, key, chunkCounter);
-                await writer.write(new Uint8Array(decryptedChunk))
+                await writer.write(new Uint8Array(decryptedChunk));
                 chunkCounter += BigInt(1);
 
-                const progressPercent = ((receivedBytes / downloadSize) * 100).toFixed(1)
+                const progressPercent = ((receivedBytes / downloadSize) * 100).toFixed(1);
                 if (progressPercent !== lastProgressPercent) {
                     onProgress(progressPercent);
                     lastProgressPercent = progressPercent;
                 }
 
                 // Request the next chunk manually as we cannot apply backpressure with this websocket API
-                await sendOnWebsocket(ws, "chunk")
+                await sendOnWebsocket(ws, "chunk");
             }
         } catch (e) {
-            console.log(e)
-            ws.close()
+            console.log(e);
+            ws.close();
         }
-    }
+    };
 
     await closePromise;
     if (receivedBytes !== downloadSize) {
-        console.log("Received bytes", receivedBytes, "Expected bytes", downloadSize)
-        await writer.abort()
-        throw new Error("Download was interrupted")
+        console.log("Received bytes", receivedBytes, "Expected bytes", downloadSize);
+        await writer.abort();
+        throw new Error("Download was interrupted");
     }
 
     await writer.close();
@@ -336,16 +343,16 @@ function base64ToArrayBuffer(base64) {
 async function openWebsocket(path) {
     const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
     const hostPath = window.location.host + window.location.pathname;
-    const ws = new WebSocket(protocol + hostPath + path)
+    const ws = new WebSocket(protocol + hostPath + path);
     const startPromise = new Promise((resolve, reject) => {
         ws.onopen = function () {
-            resolve()
-        }
+            resolve();
+        };
         ws.onerror = (evt) => {
             console.log(evt);
             reject(new Error("Websocket connection failed"));
-        }
-    })
+        };
+    });
     await startPromise;
     return ws;
 }
@@ -353,18 +360,18 @@ async function openWebsocket(path) {
 function receiveFromWebsocket(ws) {
     return new Promise((accept, reject) => {
         ws.onerror = (evt) => {
-            console.log(evt)
+            console.log(evt);
             reject(new Error("Websocket error"));
-        }
+        };
         ws.onmessage = (evt) => {
             accept(evt);
-        }
-    })
+        };
+    });
 }
 
 async function sendOnWebsocket(ws, data) {
     if (ws.readyState !== WebSocket.OPEN) {
-        throw new Error("Invalid websocket state")
+        throw new Error("Invalid websocket state");
     }
-    await ws.send(data)
+    await ws.send(data);
 }
