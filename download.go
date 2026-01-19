@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -71,7 +72,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	f, err := os.OpenFile(config.DataDir+"files/"+strconv.FormatInt(decryptedID, 10), os.O_RDONLY, 0660)
+	f, err := os.OpenFile(filepath.Join(config.DataDir, "files", strconv.FormatInt(decryptedID, 10)), os.O_RDONLY, 0660)
 	if err != nil {
 		slog.Error("error opening file", "err", err)
 		sendWebsocketError(c, "")
