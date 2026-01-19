@@ -28,7 +28,7 @@ export async function getFileMetaData(id, key) {
 }
 
 export async function uploadFile(file, expiry, maxDownloads, onProgress) {
-    const BUFFER_THRESHOLD = 4 * 1024 * 1024; // 4MB
+    const BUFFER_THRESHOLD = 3 * 1024 * 1024; // 3MB
 
     return new Promise(async (resolve, reject) => {
         try {
@@ -55,7 +55,7 @@ export async function uploadFile(file, expiry, maxDownloads, onProgress) {
             let sentBytesEncrypted = 0;
             let lastProgressPercent = "0";
 
-            const mReader = new FullStreamReader(5000008, stream)
+            const mReader = new FullStreamReader(3000000, stream)
 
             while (true) {
                 const {done, value} = await mReader.read()
@@ -158,13 +158,13 @@ class FullStreamReader {
 }
 
 function encryptData(chunk, key, chunkCounter) {
-    const dv = new DataView(new ArrayBuffer(16), 0);
+    const dv = new DataView(new ArrayBuffer(12), 0);
     dv.setBigUint64(0, chunkCounter);
     return window.crypto.subtle.encrypt({name: 'AES-GCM', iv: dv.buffer, tagLength: 128}, key, chunk);
 }
 
 function decryptData(chunk, key, chunkCounter) {
-    const dv = new DataView(new ArrayBuffer(16), 0);
+    const dv = new DataView(new ArrayBuffer(12), 0);
     dv.setBigUint64(0, chunkCounter);
     return window.crypto.subtle.decrypt({name: 'AES-GCM', iv: dv.buffer, tagLength: 128}, key, chunk);
 }
